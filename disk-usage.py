@@ -1,0 +1,79 @@
+import sys
+import os
+import shutil
+import csv
+import datetime
+from drive import Drive
+from csvfile import CSVFile
+from pathlib import Path
+from utils import subtract, nextWeek, sumKV
+
+SEARCH_PATH = "/mnt/"
+
+class DiskUsage:
+    # I probably should be using a database instead of CSV.
+    def __init__(self, basepath) -> None:
+        basepath = Path(basepath)
+        self.SIZE_FILE = basepath.joinpath("size_daily.csv")
+        self.DIFF_FILE = basepath.joinpath("diff_daily.csv")
+        self.WEEKLY_SIZE_FILE = basepath.joinpath("size_weekly.csv")
+        self.WEEKLY_DIFF_FILE = basepath.joinpath("diff_weekly.csv")
+        pass
+
+    @staticmethod
+    def __daily2weeklyRow(row_):
+        row = row_.copy()
+        row["time"] = row["next_week"]
+        row.pop("next_week")
+        return row
+
+
+    def update(self):
+        nextWeek_ = nextWeek().isoformat()
+
+        sizeDaily = CSVFile(self.SIZE_FILE)
+        currentlyUsed = Drive.getUsed(SEARCH_PATH)
+        sizeDaily.addRow(currentlyUsed)
+        sizeDaily.efficientWriteFile()
+        if sizeDaily.length < 2:
+            return 0 # Break for new files
+        
+        sizeWeekly = CSVFile(self.WEEKLY_SIZE_FILE)
+        sizeWeeklyRow = self.__daily2weeklyRow(currentlyUsed)
+        previousNextWeek = sizeDaily.getRow(-2).get("next_week")
+        if sizeWeekly.length < 1:
+            sizeWeekly.addRow(sizeWeeklyRow)
+        elif previousNextWeek == nextWeek_:
+            sizeWeekly.replaceByKV("time", nextWeek_, sizeWeeklyRow, backwards=True, start=-1)
+        else:
+            sizeWeekly.addRow(sizeWeeklyRow)
+            previousWeeklyRow = sizeWeeklyRow.copy()
+            previousWeeklyRow.update({ "time" : previousNextWeek })
+            sizeWeekly.replaceByKV("time", previousNextWeek, previousWeeklyRow, backwards=True, start=-1)
+        sizeWeekly.efficientWriteFile()
+
+        delta = subtract(sizeDaily.getRow(-1),sizeDaily.getRow(-2))
+        diffDaily = CSVFile(self.DIFF_FILE)
+        diffDaily.addRow(delta)
+        diffDaily.efficientWriteFile()
+        
+        
+        if sizeWeekly.length < 2:
+            return 0 # Break for new files
+        diffWeekly = CSVFile(self.WEEKLY_DIFF_FILE)
+        previousNextWeek = diffDaily.getRow(-2).get("next_week")
+        delta = subtract(sizeWeekly.getRow(-1), sizeWeekly.getRow(-2))
+        print(previousNextWeek == nextWeek_)
+        print(delta)
+        if previousNextWeek == nextWeek_:
+            diffWeekly.replaceByKV("time", previousNextWeek, delta, backwards=True, start=-1)
+        else:
+            delta.update({ "time" : previousNextWeek })
+            diffWeekly.replaceByKV("time", previousNextWeek, delta, backwards=True, start=-1)
+            empty = diffDaily.fill()
+            empty.update({"time" : nextWeek_})
+            diffWeekly.addRow(empty)
+        diffWeekly.efficientWriteFile()
+
+if __name__ == '__main__':
+    DiskUsage("/home/peter/scripts/datalogging/disk-usage/testfiles").update()
