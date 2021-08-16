@@ -79,7 +79,7 @@ set grid xtics;
 
 PLOT_DIFF = """
 set autoscale y
-set ylabel '{/Symbol D}Used [ISO definition]' textcolor 'white';
+set ylabel '{/Symbol D}Used [SI definition]' textcolor 'white';
 set format y '%+08.3s %cB';
 
 set y2label '{/Symbol D}Used (GB)' textcolor 'white';
@@ -90,7 +90,7 @@ set format y2 '%+08.3s %c';
 PLOT_0="""set title 'Used capacity of disks (last 28 days)' textcolor 'white';
 
 set format y '%.2s %cB';
-set ylabel 'Used [ISO definition]' textcolor 'white';
+set ylabel 'Used [SI definition]' textcolor 'white';
 set ytics 0.25*10**12;
 set mytics 2;
 
@@ -119,7 +119,7 @@ set offset graph 0, graph 0, graph 0.02, graph 0.02;
 PLOT_2="""
 set title 'Used capacity of disks (last 364 days)' textcolor 'white';
 
-set ylabel 'Used [ISO definition]' textcolor 'white';
+set ylabel 'Used [SI definition]' textcolor 'white';
 set format y '%.2s %cB';
 set ytics 0.25*10**12;
 set mytics 2;

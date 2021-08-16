@@ -7,6 +7,7 @@ from drive import Drive
 from csvfile import CSVFile
 from pathlib import Path
 from utils import subtract, nextWeek, sumKV
+from datetime import timedelta
 
 SEARCH_PATH = "/mnt/"
 
@@ -27,9 +28,28 @@ class DiskUsage:
         row.pop("next_week")
         return row
 
+    @staticmethod
+    def __update_weekly_data(csvfile, updatedRow, previousNextWeek, nextWeek, 
+                             makeEmpty=False, duplicateEmpty=0, updateLast=False):
+        if csvfile.length < 1:
+            if makeEmpty:
+                csvfile.fill(updatedRow,updateKVs=[{ "time" : (nextWeek + timedelta(days=-7)).isoformat() }])
+            for i in range(0,duplicateEmpty):
+                csvfile.addRow(updatedRow)
+            csvfile.addRow(updatedRow)
+        elif previousNextWeek == nextWeek.isoformat():
+            csvfile.replaceByKV("time", nextWeek.isoformat(), updatedRow, backwards=True, start=-1)
+        else:
+            csvfile.addRow(updatedRow)
+            previousWeeklyRow = updatedRow.copy()
+            previousWeeklyRow.update({ "time" : previousNextWeek })
+            if updateLast:
+                csvfile.replaceByKV("time", previousNextWeek, previousWeeklyRow, backwards=True, start=-1)
+        csvfile.efficientWriteFile()
+
 
     def update(self):
-        nextWeek_ = nextWeek().isoformat()
+        nextWeek_ = nextWeek()
 
         sizeDaily = CSVFile(self.SIZE_FILE)
         currentlyUsed = Drive.getUsed(SEARCH_PATH)
@@ -41,16 +61,8 @@ class DiskUsage:
         sizeWeekly = CSVFile(self.WEEKLY_SIZE_FILE)
         sizeWeeklyRow = self.__daily2weeklyRow(currentlyUsed)
         previousNextWeek = sizeDaily.getRow(-2).get("next_week")
-        if sizeWeekly.length < 1:
-            sizeWeekly.addRow(sizeWeeklyRow)
-        elif previousNextWeek == nextWeek_:
-            sizeWeekly.replaceByKV("time", nextWeek_, sizeWeeklyRow, backwards=True, start=-1)
-        else:
-            sizeWeekly.addRow(sizeWeeklyRow)
-            previousWeeklyRow = sizeWeeklyRow.copy()
-            previousWeeklyRow.update({ "time" : previousNextWeek })
-            sizeWeekly.replaceByKV("time", previousNextWeek, previousWeeklyRow, backwards=True, start=-1)
-        sizeWeekly.efficientWriteFile()
+        self.__update_weekly_data(sizeWeekly, sizeWeeklyRow, previousNextWeek, nextWeek_,
+                                  duplicateEmpty=1, updateLast=True)
 
         delta = subtract(sizeDaily.getRow(-1),sizeDaily.getRow(-2))
         diffDaily = CSVFile(self.DIFF_FILE)
@@ -61,19 +73,10 @@ class DiskUsage:
         if sizeWeekly.length < 2:
             return 0 # Break for new files
         diffWeekly = CSVFile(self.WEEKLY_DIFF_FILE)
-        previousNextWeek = diffDaily.getRow(-2).get("next_week")
-        delta = subtract(sizeWeekly.getRow(-1), sizeWeekly.getRow(-2))
-        print(previousNextWeek == nextWeek_)
+        diffWeeklyRow = subtract(sizeWeekly.getRow(-1), sizeWeekly.getRow(-2))
         print(delta)
-        if previousNextWeek == nextWeek_:
-            diffWeekly.replaceByKV("time", previousNextWeek, delta, backwards=True, start=-1)
-        else:
-            delta.update({ "time" : previousNextWeek })
-            diffWeekly.replaceByKV("time", previousNextWeek, delta, backwards=True, start=-1)
-            empty = diffDaily.fill()
-            empty.update({"time" : nextWeek_})
-            diffWeekly.addRow(empty)
-        diffWeekly.efficientWriteFile()
+        self.__update_weekly_data(diffWeekly, diffWeeklyRow, previousNextWeek, nextWeek_,
+                                  makeEmpty=True)
 
 if __name__ == '__main__':
     DiskUsage("/home/peter/scripts/datalogging/disk-usage/testfiles").update()

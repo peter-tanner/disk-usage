@@ -1,4 +1,5 @@
 import csv
+from copy import copy
 from pathlib import Path
 
 class CSVFile:
@@ -35,6 +36,7 @@ class CSVFile:
                 self.__fields.append(field)
         self.__data.append(row)
         self.__addBuffer.append(row)
+        self.length = len(self.__data)
 
     def getRow(self,rowIdx):
         return self.__data[rowIdx]
@@ -118,7 +120,10 @@ class CSVFile:
             return count > 0
         return False
     
-    def fill(self, v=0):
-        if len(self.__data) == 0:
-            return False
-        return { k:v for k in self.__data[0].keys() }
+    def fill(self, row, fillV=0, updateKVs=[]):
+        row = copy(row)
+        for k in row:
+            row[k] = fillV
+        for kv in updateKVs:
+            row.update(kv)
+        self.addRow(row)
